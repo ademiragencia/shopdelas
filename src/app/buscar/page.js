@@ -4,12 +4,14 @@ import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import ProductCard from "@/components/ProductCard";
-import { products, categories } from "@/lib/data";
+import { categories } from "@/lib/data";
+import { useStore } from "@/lib/store";
 
 const SUGESTOES = ["Vestido", "Tênis", "Jaqueta", "Legging", "Bolsa", "Cropped", "Boné"];
 
 function SearchInner() {
   const params = useSearchParams();
+  const { products } = useStore();
   const [q, setQ] = useState(params.get("q") || "");
   const [cat, setCat] = useState("todos");
 
@@ -19,7 +21,7 @@ function SearchInner() {
     const t = q.trim().toLowerCase();
     if (t) list = list.filter((p) => p.nome.toLowerCase().includes(t));
     return list;
-  }, [q, cat]);
+  }, [q, cat, products]);
 
   return (
     <>

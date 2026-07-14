@@ -49,3 +49,32 @@ export function tile(seed, emoji = "👕", { w = 600, h = 600, label = "" } = {}
 export function avatarTile(seed, emoji = "🏬") {
   return tile(seed, emoji, { w: 200, h: 200 });
 }
+
+// QR Code fictício (apenas visual) determinístico a partir da chave
+export function qr(seed) {
+  const n = 21;
+  const cell = 8;
+  const size = n * cell;
+  let h1 = hash(seed) || 1;
+  const rnd = () => {
+    h1 = (h1 * 1103515245 + 12345) & 0x7fffffff;
+    return h1 / 0x7fffffff;
+  };
+  const finder = (x, y) =>
+    (x < 7 && y < 7) || (x >= n - 7 && y < 7) || (x < 7 && y >= n - 7);
+  let rects = "";
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      if (finder(x, y)) continue;
+      if (rnd() > 0.52) rects += `<rect x="${x * cell}" y="${y * cell}" width="${cell}" height="${cell}"/>`;
+    }
+  }
+  const eye = (ex, ey) =>
+    `<rect x="${ex * cell}" y="${ey * cell}" width="${7 * cell}" height="${7 * cell}" fill="none" stroke="#111" stroke-width="${cell}"/>` +
+    `<rect x="${(ex + 2) * cell}" y="${(ey + 2) * cell}" width="${3 * cell}" height="${3 * cell}"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <rect width="${size}" height="${size}" fill="#fff"/>
+    <g fill="#111">${rects}${eye(0, 0)}${eye(n - 7, 0)}${eye(0, n - 7)}</g>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}

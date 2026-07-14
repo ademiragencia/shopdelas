@@ -1,7 +1,7 @@
 {
-  "name": "ModaExpress — Roupas com entrega",
-  "short_name": "ModaExpress",
-  "description": "Marketplace de moda com entrega expressa. Estilo iFood + Shopee.",
+  "name": "Vistê — Vestiu, chegou.",
+  "short_name": "Vistê",
+  "description": "Marketplace de moda com entrega expressa e rastreamento. Estilo iFood + Shopee.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ee4d2d",

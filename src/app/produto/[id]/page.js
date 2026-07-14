@@ -5,13 +5,13 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { useToast } from "@/components/Toast";
-import { getProduct, getStore, formatBRL, storeAvatar } from "@/lib/data";
+import { formatBRL, storeAvatar } from "@/lib/data";
 
 export default function ProductPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { addToCart, toggleFavorite, isFavorite, count, getProduct, getStore } = useStore();
   const product = getProduct(id);
-  const { addToCart, toggleFavorite, isFavorite, count } = useStore();
   const toast = useToast();
 
   const [tamanho, setTamanho] = useState(null);

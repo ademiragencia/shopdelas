@@ -1,28 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { useToast } from "@/components/Toast";
 import { formatBRL } from "@/lib/data";
+import { qr } from "@/lib/image";
 
-const PAGAMENTOS = [
-  { id: "pix", label: "Pix", ic: "⚡", desc: "Aprovação na hora" },
-  { id: "credito", label: "Cartão de crédito", ic: "💳", desc: "Em até 3x sem juros" },
-  { id: "dinheiro", label: "Dinheiro na entrega", ic: "💵", desc: "Troco para quanto?" },
+const ENTREGA_METODOS = [
+  { id: "cartao", label: "Cartão (maquininha)", ic: "💳" },
+  { id: "dinheiro", label: "Dinheiro", ic: "💵" },
+  { id: "pix", label: "Pix na entrega", ic: "📱" },
 ];
 
 export default function CheckoutPage() {
   const router = useRouter();
   const toast = useToast();
-  const { state, subtotal, frete, total, setAddress, placeOrder } = useStore();
+  const { state, subtotal, frete, total, setAddress, placeOrder, getStore } = useStore();
   const cart = state.cart;
 
   const [form, setForm] = useState(
     state.address || { nome: "", rua: "", numero: "", bairro: "", cidade: "Campo Grande", cep: "" }
   );
-  const [pag, setPag] = useState("pix");
+  const [modo, setModo] = useState("pix_online"); // 'pix_online' | 'entrega'
+  const [metodoEntrega, setMetodoEntrega] = useState("cartao");
+
+  // Lojas presentes na sacola (para o Pix online por loja)
+  const lojasNaSacola = useMemo(() => {
+    const map = {};
+    cart.forEach((i) => {
+      if (!map[i.storeId]) map[i.storeId] = { store: getStore(i.storeId), valor: 0 };
+      map[i.storeId].valor += i.preco * i.qtd;
+    });
+    return Object.values(map).filter((x) => x.store);
+  }, [cart, getStore]);
 
   if (cart.length === 0) {
     return (
@@ -42,28 +54,49 @@ export default function CheckoutPage() {
     );
   }
 
-  function up(k, v) {
-    setForm((f) => ({ ...f, [k]: v }));
+  const up = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  function copiar(chave) {
+    navigator?.clipboard?.writeText(chave).then(
+      () => toast("Chave Pix copiada 📋"),
+      () => toast("Copie a chave manualmente", "⚠️")
+    );
   }
 
   function finalizar() {
     if (!form.nome || !form.rua || !form.numero || !form.bairro) {
-      toast("Preencha o endereço de entrega", "⚠️");
-      return;
+      return toast("Preencha o endereço de entrega", "⚠️");
     }
     setAddress(form);
-    const order = {
-      id: "PED" + Date.now().toString().slice(-6),
+
+    const pagamento =
+      modo === "pix_online"
+        ? {
+            modo: "pix_online",
+            resumo: "Pix online (pago à loja)",
+            pago: true,
+            pixKeys: lojasNaSacola.map((l) => ({
+              loja: l.store.nome,
+              chave: l.store.pixKey,
+              tipo: l.store.pixTipo,
+              valor: l.valor,
+            })),
+          }
+        : {
+            modo: "entrega",
+            resumo: `Na entrega · ${ENTREGA_METODOS.find((m) => m.id === metodoEntrega)?.label}`,
+            metodo: metodoEntrega,
+            pago: false,
+          };
+
+    const order = placeOrder({
       itens: cart,
       subtotal,
       frete,
       total,
       endereco: form,
-      pagamento: PAGAMENTOS.find((p) => p.id === pag)?.label,
-      criadoEm: Date.now(),
-      statusIndex: 0,
-    };
-    placeOrder(order);
+      pagamento,
+    });
     toast("Pedido confirmado! 🎉");
     router.push(`/pedido/${order.id}`);
   }
@@ -111,21 +144,62 @@ export default function CheckoutPage() {
       {/* Pagamento */}
       <div className="card-block">
         <h3>💳 Forma de pagamento</h3>
-        {PAGAMENTOS.map((p) => (
-          <button
-            key={p.id}
-            className={`pay-opt ${pag === p.id ? "is-active" : ""}`}
-            onClick={() => setPag(p.id)}
-            style={{ width: "100%" }}
-          >
-            <span className="pay-opt__ic">{p.ic}</span>
-            <div style={{ textAlign: "left", flex: 1 }}>
-              <div>{p.label}</div>
-              <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>{p.desc}</div>
-            </div>
-            <span>{pag === p.id ? "🔘" : "⚪"}</span>
-          </button>
-        ))}
+        <button className={`pay-opt ${modo === "pix_online" ? "is-active" : ""}`} onClick={() => setModo("pix_online")} style={{ width: "100%" }}>
+          <span className="pay-opt__ic">⚡</span>
+          <div style={{ textAlign: "left", flex: 1 }}>
+            <div>Pix online</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>Pague agora na chave Pix da loja</div>
+          </div>
+          <span>{modo === "pix_online" ? "🔘" : "⚪"}</span>
+        </button>
+        <button className={`pay-opt ${modo === "entrega" ? "is-active" : ""}`} onClick={() => setModo("entrega")} style={{ width: "100%" }}>
+          <span className="pay-opt__ic">🛵</span>
+          <div style={{ textAlign: "left", flex: 1 }}>
+            <div>Pagar na entrega</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>Cartão, dinheiro ou pix ao receber</div>
+          </div>
+          <span>{modo === "entrega" ? "🔘" : "⚪"}</span>
+        </button>
+
+        {/* Pix online — chaves por loja */}
+        {modo === "pix_online" && (
+          <div style={{ marginTop: 12 }}>
+            {lojasNaSacola.map((l) => (
+              <div key={l.store.id} className="pix-box">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <strong>{l.store.emoji} {l.store.nome}</strong>
+                  <span className="price__now" style={{ fontSize: 15 }}>{formatBRL(l.valor)}</span>
+                </div>
+                <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 10 }}>
+                  <img src={qr(l.store.pixKey)} alt="QR Pix" style={{ width: 84, height: 84, borderRadius: 8, border: "1px solid var(--line)" }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>Chave Pix ({l.store.pixTipo})</div>
+                    <div style={{ fontWeight: 700, wordBreak: "break-all", fontSize: 14 }}>{l.store.pixKey}</div>
+                    <button className="btn btn--outline" style={{ padding: "8px 12px", marginTop: 8, fontSize: 13 }} onClick={() => copiar(l.store.pixKey)}>
+                      📋 Copiar chave
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <p className="helper" style={{ padding: "6px 0 0" }}>
+              Você paga direto para cada loja. Ao confirmar, o pedido já entra como <strong>pago</strong>.
+            </p>
+          </div>
+        )}
+
+        {/* Na entrega — método */}
+        {modo === "entrega" && (
+          <div style={{ marginTop: 12 }}>
+            {ENTREGA_METODOS.map((m) => (
+              <button key={m.id} className={`pay-opt ${metodoEntrega === m.id ? "is-active" : ""}`} onClick={() => setMetodoEntrega(m.id)} style={{ width: "100%" }}>
+                <span className="pay-opt__ic">{m.ic}</span>
+                <div style={{ flex: 1, textAlign: "left" }}>{m.label}</div>
+                <span>{metodoEntrega === m.id ? "🔘" : "⚪"}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Resumo */}
@@ -146,7 +220,7 @@ export default function CheckoutPage() {
 
       <div style={{ padding: "4px 14px 30px" }}>
         <button className="btn btn--primary btn--block" onClick={finalizar}>
-          Confirmar pedido · {formatBRL(total)}
+          {modo === "pix_online" ? "Já paguei · Confirmar pedido" : "Confirmar pedido"} · {formatBRL(total)}
         </button>
       </div>
     </>

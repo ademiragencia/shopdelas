@@ -1,0 +1,171 @@
+"use client";
+
+import { Suspense, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useStore } from "@/lib/store";
+import { useToast } from "@/components/Toast";
+import { categories } from "@/lib/data";
+
+const TIPOS = [
+  { id: "cliente", label: "Cliente", emoji: "🛍️", desc: "Comprar roupas" },
+  { id: "lojista", label: "Lojista", emoji: "🏬", desc: "Vender na Vistê" },
+  { id: "entregador", label: "Entregador", emoji: "🛵", desc: "Fazer entregas" },
+];
+
+const EMOJIS_LOJA = ["🏬", "👗", "👕", "👟", "👜", "🧥", "🧸", "🕶️", "👑", "✨"];
+const PIX_TIPOS = ["E-mail", "Telefone", "CPF", "CNPJ", "Aleatória"];
+
+function CadastroInner() {
+  const router = useRouter();
+  const toast = useToast();
+  const params = useSearchParams();
+  const { register } = useStore();
+
+  const [tipo, setTipo] = useState(params.get("tipo") || "cliente");
+  const [f, setF] = useState({
+    nome: "",
+    email: "",
+    senha: "",
+    storeNome: "",
+    categoria: "feminino",
+    emoji: "🏬",
+    pixKey: "",
+    pixTipo: "E-mail",
+    veiculo: "",
+    placa: "",
+  });
+
+  const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
+
+  function submit() {
+    if (!f.nome || !f.email || !f.senha) return toast("Preencha nome, e-mail e senha", "⚠️");
+    if (tipo === "lojista" && !f.storeNome) return toast("Informe o nome da loja", "⚠️");
+    if (tipo === "lojista" && !f.pixKey) return toast("Informe a chave Pix da loja", "⚠️");
+    if (tipo === "entregador" && !f.veiculo) return toast("Informe seu veículo", "⚠️");
+
+    const res = register({ tipo, ...f });
+    if (!res.ok) return toast(res.erro, "⚠️");
+    toast("Conta criada! 🎉");
+    router.push(tipo === "lojista" ? "/lojista" : tipo === "entregador" ? "/entregador" : "/");
+  }
+
+  return (
+    <>
+      <header className="pagehead">
+        <button className="back-btn" onClick={() => router.back()}>‹</button>
+        <span className="pagehead__title">Criar conta</span>
+      </header>
+
+      <div className="card-block">
+        <h3>Quero me cadastrar como</h3>
+        <div className="tipos">
+          {TIPOS.map((t) => (
+            <button
+              key={t.id}
+              className={`tipo ${tipo === t.id ? "is-active" : ""}`}
+              onClick={() => setTipo(t.id)}
+            >
+              <span style={{ fontSize: 26 }}>{t.emoji}</span>
+              <strong>{t.label}</strong>
+              <span style={{ fontSize: 11, color: "var(--muted)" }}>{t.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card-block">
+        <h3>Seus dados</h3>
+        <div className="field">
+          <label>Nome completo</label>
+          <input value={f.nome} onChange={(e) => up("nome", e.target.value)} placeholder="Seu nome" />
+        </div>
+        <div className="field">
+          <label>E-mail</label>
+          <input type="email" value={f.email} onChange={(e) => up("email", e.target.value)} placeholder="voce@email.com" />
+        </div>
+        <div className="field">
+          <label>Senha</label>
+          <input type="password" value={f.senha} onChange={(e) => up("senha", e.target.value)} placeholder="••••••" />
+        </div>
+      </div>
+
+      {tipo === "lojista" && (
+        <div className="card-block">
+          <h3>Dados da loja</h3>
+          <div className="field">
+            <label>Nome da loja</label>
+            <input value={f.storeNome} onChange={(e) => up("storeNome", e.target.value)} placeholder="Ex: Ateliê da Ana" />
+          </div>
+          <div className="field">
+            <label>Categoria principal</label>
+            <select value={f.categoria} onChange={(e) => up("categoria", e.target.value)}>
+              {categories.filter((c) => c.id !== "todos").map((c) => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>Ícone da loja</label>
+            <div className="opts">
+              {EMOJIS_LOJA.map((e) => (
+                <button key={e} className={`opt ${f.emoji === e ? "is-active" : ""}`} onClick={() => up("emoji", e)} style={{ fontSize: 20 }}>
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="row2">
+            <div className="field">
+              <label>Tipo da chave Pix</label>
+              <select value={f.pixTipo} onChange={(e) => up("pixTipo", e.target.value)}>
+                {PIX_TIPOS.map((t) => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label>Chave Pix</label>
+              <input value={f.pixKey} onChange={(e) => up("pixKey", e.target.value)} placeholder="sua chave" />
+            </div>
+          </div>
+          <p className="helper" style={{ padding: 0 }}>
+            🔑 É nessa chave que os clientes vão pagar quando escolherem <strong>Pix online</strong>.
+          </p>
+        </div>
+      )}
+
+      {tipo === "entregador" && (
+        <div className="card-block">
+          <h3>Dados do entregador</h3>
+          <div className="field">
+            <label>Veículo</label>
+            <input value={f.veiculo} onChange={(e) => up("veiculo", e.target.value)} placeholder="Ex: Honda CG 160" />
+          </div>
+          <div className="field">
+            <label>Placa</label>
+            <input value={f.placa} onChange={(e) => up("placa", e.target.value)} placeholder="ABC-1D23" />
+          </div>
+          <p className="helper" style={{ padding: 0 }}>
+            🛵 Ao ficar <strong>disponível</strong>, você recebe corridas automaticamente quando houver vendas.
+          </p>
+        </div>
+      )}
+
+      <div style={{ padding: "4px 14px 20px" }}>
+        <button className="btn btn--primary btn--block" onClick={submit}>
+          Criar conta
+        </button>
+        <p className="helper" style={{ textAlign: "center", marginTop: 12 }}>
+          Já tem conta? <Link href="/entrar" style={{ color: "var(--primary)", fontWeight: 700 }}>Entrar</Link>
+        </p>
+      </div>
+    </>
+  );
+}
+
+export default function CadastroPage() {
+  return (
+    <Suspense fallback={<div className="empty"><div className="empty__emoji">📝</div></div>}>
+      <CadastroInner />
+    </Suspense>
+  );
+}

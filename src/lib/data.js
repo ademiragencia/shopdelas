@@ -12,12 +12,22 @@ export const categories = [
 ];
 
 export const stores = [
-  { id: "urban", nome: "Urban Style", emoji: "🧥", categoria: "masculino", rating: 4.8, avaliacoes: 1204, tempo: "30-45 min", frete: 0, cupom: "Frete grátis acima de R$99", selo: "Loja Oficial" },
-  { id: "bella", nome: "Bella Moda", emoji: "👗", categoria: "feminino", rating: 4.9, avaliacoes: 2380, tempo: "25-40 min", frete: 7.9, cupom: "10% OFF na 1ª compra", selo: "Top Vendas" },
-  { id: "kids", nome: "Mundo Kids", emoji: "🧸", categoria: "infantil", rating: 4.7, avaliacoes: 640, tempo: "40-60 min", frete: 9.9, cupom: null, selo: null },
-  { id: "sneaker", nome: "SneakerBox", emoji: "👟", categoria: "calcados", rating: 4.9, avaliacoes: 3110, tempo: "35-50 min", frete: 0, cupom: "Frete grátis", selo: "Loja Oficial" },
-  { id: "fit", nome: "FitPro Sports", emoji: "🏃", categoria: "esporte", rating: 4.6, avaliacoes: 890, tempo: "30-45 min", frete: 6.9, cupom: null, selo: null },
-  { id: "acess", nome: "Charme Acessórios", emoji: "👜", categoria: "acessorios", rating: 4.8, avaliacoes: 1520, tempo: "20-35 min", frete: 5.9, cupom: "Leve 3 pague 2", selo: "Top Vendas" },
+  { id: "urban", nome: "Urban Style", emoji: "🧥", categoria: "masculino", rating: 4.8, avaliacoes: 1204, tempo: "30-45 min", frete: 0, cupom: "Frete grátis acima de R$99", selo: "Loja Oficial", pixKey: "contato@urbanstyle.com.br", pixTipo: "E-mail", coord: { x: 22, y: 26 } },
+  { id: "bella", nome: "Bella Moda", emoji: "👗", categoria: "feminino", rating: 4.9, avaliacoes: 2380, tempo: "25-40 min", frete: 7.9, cupom: "10% OFF na 1ª compra", selo: "Top Vendas", pixKey: "67 99123-4567", pixTipo: "Telefone", coord: { x: 74, y: 20 } },
+  { id: "kids", nome: "Mundo Kids", emoji: "🧸", categoria: "infantil", rating: 4.7, avaliacoes: 640, tempo: "40-60 min", frete: 9.9, cupom: null, selo: null, pixKey: "31.402.155/0001-70", pixTipo: "CNPJ", coord: { x: 18, y: 74 } },
+  { id: "sneaker", nome: "SneakerBox", emoji: "👟", categoria: "calcados", rating: 4.9, avaliacoes: 3110, tempo: "35-50 min", frete: 0, cupom: "Frete grátis", selo: "Loja Oficial", pixKey: "pix@sneakerbox.com", pixTipo: "E-mail", coord: { x: 80, y: 70 } },
+  { id: "fit", nome: "FitPro Sports", emoji: "🏃", categoria: "esporte", rating: 4.6, avaliacoes: 890, tempo: "30-45 min", frete: 6.9, cupom: null, selo: null, pixKey: "67 98888-2020", pixTipo: "Telefone", coord: { x: 30, y: 50 } },
+  { id: "acess", nome: "Charme Acessórios", emoji: "👜", categoria: "acessorios", rating: 4.8, avaliacoes: 1520, tempo: "20-35 min", frete: 5.9, cupom: "Leve 3 pague 2", selo: "Top Vendas", pixKey: "charme.acessorios@pix.com", pixTipo: "E-mail", coord: { x: 68, y: 48 } },
+];
+
+// Ponto de entrega padrão do cliente no mapa (0..100)
+export const HOME_COORD = { x: 50, y: 88 };
+
+// Entregadores base — usados quando nenhum motoentregador cadastrado está online
+export const seedRiders = [
+  { id: "r-carlos", nome: "Carlos Souza", veiculo: "Honda CG 160", placa: "OAB-2B34", rating: 4.9, emoji: "🛵", base: true },
+  { id: "r-jean", nome: "Jean Oliveira", veiculo: "Yamaha Factor", placa: "NNP-7C88", rating: 4.8, emoji: "🏍️", base: true },
+  { id: "r-marcos", nome: "Marcos Lima", veiculo: "Honda Biz", placa: "QAX-1F09", rating: 4.7, emoji: "🛵", base: true },
 ];
 
 // Helpers para gerar variações

@@ -6,19 +6,13 @@ import { useRouter } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import ProductCard from "@/components/ProductCard";
 import { useStore } from "@/lib/store";
-import {
-  categories,
-  stores,
-  products,
-  banners,
-  storeAvatar,
-} from "@/lib/data";
+import { categories, banners, storeAvatar } from "@/lib/data";
 
 export default function Home() {
   const [cat, setCat] = useState("todos");
   const [q, setQ] = useState("");
   const router = useRouter();
-  const { count } = useStore();
+  const { count, products, stores } = useStore();
 
   const filtered = useMemo(() => {
     let list = products;
@@ -28,7 +22,7 @@ export default function Home() {
       list = list.filter((p) => p.nome.toLowerCase().includes(t));
     }
     return list;
-  }, [cat, q]);
+  }, [cat, q, products]);
 
   const featuredStores = cat === "todos" ? stores : stores.filter((s) => s.categoria === cat);
 
@@ -41,18 +35,25 @@ export default function Home() {
     <>
       {/* Top bar */}
       <header className="topbar">
-        <div className="topbar__row">
-          <div className="topbar__loc" style={{ flex: 1 }}>
-            <span>📍 Entregar em</span>
-            <strong>Casa · Campo Grande, MS ⌄</strong>
+        <div className="topbar__row" style={{ marginBottom: 8 }}>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 22 }}>🛍️</span>
+            <div>
+              <div style={{ fontWeight: 900, fontSize: 20, lineHeight: 1 }}>Vistê</div>
+              <div style={{ fontSize: 11, opacity: 0.9 }}>Vestiu, chegou.</div>
+            </div>
           </div>
-          <Link href="/pedidos" className="icon-btn" aria-label="pedidos">
-            🧾
+          <Link href="/perfil" className="icon-btn" aria-label="conta">
+            👤
           </Link>
           <Link href="/carrinho" className="icon-btn" aria-label="carrinho">
             🛒
             {count > 0 && <span className="badge">{count}</span>}
           </Link>
+        </div>
+        <div className="topbar__loc">
+          <span>📍 Entregar em</span>
+          <strong>Casa · Campo Grande, MS ⌄</strong>
         </div>
         <form className="search" onSubmit={submitSearch}>
           <span>🔍</span>

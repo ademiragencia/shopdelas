@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import ProductCard from "@/components/ProductCard";
-import { getStore, productsByStore, storeAvatar } from "@/lib/data";
+import { storeAvatar } from "@/lib/data";
+import { useStore } from "@/lib/store";
 
 export default function StorePage() {
   const { id } = useParams();
   const router = useRouter();
+  const { getStore, productsByStore } = useStore();
   const store = getStore(id);
   const items = productsByStore(id);
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useStore, ORDER_STEPS } from "@/lib/store";
 import { formatBRL } from "@/lib/data";
+import MapTrack from "@/components/MapTrack";
 
 export default function OrderTrackingPage() {
   const { id } = useParams();
@@ -45,6 +46,28 @@ export default function OrderTrackingPage() {
         </p>
         <div style={{ marginTop: 6, fontSize: 12, opacity: 0.9 }}>Pedido #{order.id}</div>
       </div>
+
+      {/* Mapa de rastreamento */}
+      {order.rider && order.storeCoord && (
+        <div style={{ padding: "14px 14px 0" }}>
+          <MapTrack order={order} />
+          <div className="rider-card">
+            <div className="rider-card__ava">{order.rider.emoji || "🛵"}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 800 }}>{order.rider.nome}</div>
+              <div className="store__meta">
+                <span className="rating">★ {order.rider.rating?.toFixed(1)}</span>
+                <span className="dot" />
+                <span>{order.rider.veiculo} · {order.rider.placa}</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <a href="tel:+5567000000000" className="rider-btn">📞</a>
+              <button className="rider-btn">💬</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Etapas */}
       <div className="steps">
@@ -93,8 +116,13 @@ export default function OrderTrackingPage() {
         ))}
         <div className="summary__row" style={{ paddingTop: 12 }}>
           <span>Pagamento</span>
-          <span>{order.pagamento}</span>
+          <span>{order.pagamento?.resumo}</span>
         </div>
+        {order.pagamento?.modo === "pix_online" && (
+          <div className="notice" style={{ borderRadius: 10, marginTop: 8 }}>
+            ✅ Pago via Pix online para {order.pagamento.pixKeys?.length > 1 ? "as lojas" : "a loja"}
+          </div>
+        )}
         <div className="summary__row summary__row--total">
           <span>Total</span>
           <span>{formatBRL(order.total)}</span>

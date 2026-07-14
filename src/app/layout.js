@@ -3,9 +3,9 @@ import { StoreProvider } from "@/lib/store";
 import { ToastProvider } from "@/components/Toast";
 
 export const metadata = {
-  title: "ModaExpress — Roupas com entrega rápida",
+  title: "Vistê — Vestiu, chegou.",
   description:
-    "Marketplace de moda com entrega expressa. Milhares de peças, várias lojas, receba em casa em minutos. Estilo iFood + Shopee.",
+    "Vistê: marketplace de moda com entrega expressa. Lojas, produtos, motoentregador com rastreamento no mapa e pagamento via Pix. Estilo iFood + Shopee.",
   manifest: "/manifest.json",
 };
 

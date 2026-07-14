@@ -1,60 +1,70 @@
-# 🛍️ ModaExpress
+# 🛍️ Vistê — *Vestiu, chegou.*
 
-Marketplace de **roupas com entrega expressa** — um web app que combina o modelo do **iFood** (várias lojas + rastreamento do pedido em tempo real) com o do **Shopee** (catálogo de produtos, carrinho, avaliações, cupons e categorias).
+Marketplace de **roupas com entrega expressa** — um web app que combina o modelo do **iFood** (várias lojas, motoentregador e rastreamento no mapa) com o do **Shopee** (catálogo, carrinho, avaliações, cupons e categorias).
 
-Feito em **Next.js 14 (App Router) + React**, mobile-first, 100% autocontido (sem backend): o catálogo é local e o estado do usuário (carrinho, favoritos, pedidos) é persistido no `localStorage`.
+Multi-perfil: **cliente**, **lojista** e **motoentregador**. Feito em **Next.js 14 (App Router) + React**, mobile-first, 100% no navegador (sem backend): contas, produtos das lojas, pedidos e entregas são persistidos no `localStorage`.
 
 ## ✨ Funcionalidades
 
-- **Vitrine estilo Shopee**: categorias, banners promocionais, grade de produtos com desconto, avaliações e "vendidos".
-- **Lojas estilo iFood**: cartões de loja com nota, tempo de entrega, frete e cupom.
-- **Página de produto**: seleção de tamanho e cor, quantidade, descrição, favoritar.
-- **Sacola (carrinho)**: ajuste de quantidade, cálculo de frete grátis acima de R$99.
-- **Checkout**: endereço de entrega + forma de pagamento (Pix, cartão, dinheiro).
-- **Rastreamento do pedido**: linha do tempo animada (Confirmado → Preparando → Saiu para entrega → Perto de você → Entregue) que avança sozinha.
-- **Busca** com sugestões e filtro por categoria.
-- **Perfil** com favoritos, pedidos e cupons.
-- **PWA**: instalável, com manifest e ícone.
+### Cliente
+- Vitrine com categorias, banners, lojas e grade de produtos (descontos, avaliações, "vendidos").
+- Página de produto: tamanho, cor, quantidade, favoritar.
+- Sacola, frete grátis acima de R$99 e busca com sugestões.
+- **Pagamento**: **Pix online** (na chave Pix escolhida pela loja, com QR e "copiar chave") **ou na entrega** (cartão, dinheiro ou pix).
+- **Rastreamento no mapa**: motoentregador se movendo em tempo real da loja até você, com card do entregador e linha do tempo.
+
+### Lojista
+- Cadastro como usuário e criação automática da loja.
+- Painel com **cadastro/edição/exclusão de produtos**, pedidos recebidos e faturamento.
+- Define a **chave Pix** que recebe os pagamentos online.
+
+### Motoentregador
+- Cadastro como usuário (veículo/placa) e chave liga/desliga de disponibilidade.
+- **Atribuição automática**: ao acontecer uma venda, um entregador online é escolhido na hora.
+- Painel de corridas com **mapa**, dados da entrega e avanço de status.
 
 ## 🚀 Rodando localmente
 
 ```bash
 npm install
-npm run dev
+npm run dev   # http://localhost:3000
 ```
-
-Abra [http://localhost:3000](http://localhost:3000).
 
 ## 🏗️ Build de produção
 
 ```bash
-npm run build
-npm start
+npm run build && npm start
 ```
 
-## 📦 Deploy
+## 🧭 Como testar o fluxo completo
 
-Pronto para publicar na **Vercel** (`vercel` / import do repositório). Também funciona em qualquer host que rode Node 18+.
+1. **Cadastre um entregador** (Perfil → "Quero entregar") e deixe-o **disponível**.
+2. **Cadastre um lojista** (Perfil → "Quero vender") e **publique um produto**.
+3. Saia e, como cliente, **compre** esse produto → escolha **Pix online** ou **na entrega**.
+4. Veja o **mapa de rastreamento** avançar sozinho.
+5. Entre de volta como **entregador** para ver a corrida atribuída.
 
 ## 🗂️ Estrutura
 
 ```
 src/
-  app/                # rotas (App Router)
-    page.js           # home / vitrine
-    produto/[id]/     # detalhe do produto
-    loja/[id]/        # página da loja
-    carrinho/         # sacola
-    checkout/         # endereço + pagamento
-    pedidos/          # lista de pedidos
-    pedido/[id]/      # rastreamento
-    buscar/           # busca
-    perfil/           # perfil e favoritos
-  components/         # Toast, BottomNav, ProductCard
+  app/
+    page.js              # vitrine (cliente)
+    produto/[id]/        # detalhe do produto
+    loja/[id]/           # página da loja
+    carrinho/            # sacola
+    checkout/            # endereço + pagamento (Pix online / na entrega)
+    pedidos/  pedido/[id]/  # lista e rastreamento com mapa
+    buscar/  perfil/     # busca e central de conta
+    entrar/  cadastro/   # login e cadastro por perfil
+    lojista/  lojista/produto/   # painel e cadastro de produtos
+    entregador/          # painel de corridas do motoentregador
+  components/            # Toast, BottomNav, ProductCard, MapTrack
   lib/
-    data.js           # catálogo (lojas e produtos)
-    store.js          # estado global (carrinho/pedidos) + localStorage
-    image.js          # gerador de imagens SVG dos produtos
+    data.js              # catálogo base (lojas com chave Pix + coordenadas, entregadores base)
+    store.js             # estado global: contas, catálogo, pedidos, atribuição de entregador
+    image.js             # imagens SVG dos produtos e QR Code do Pix
 ```
 
-> Projeto de demonstração. Substitua o catálogo em `src/lib/data.js` e conecte um backend/pagamento real para produção.
+## ⚠️ Sobre o protótipo
+É uma demonstração funcional **em um dispositivo** (os dados ficam no `localStorage` do navegador, sem sincronizar entre celulares) e o pagamento Pix/mapa são **simulados**. Para produção: adicionar backend com autenticação, banco de dados, gateway de pagamento Pix real e GPS do entregador.
