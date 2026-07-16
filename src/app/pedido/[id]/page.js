@@ -9,8 +9,17 @@ import MapTrack from "@/components/MapTrack";
 export default function OrderTrackingPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { getOrder } = useStore();
+  const { getOrder, ready } = useStore();
   const order = getOrder(id);
+
+  if (!order && !ready) {
+    return (
+      <div className="empty">
+        <div className="empty__emoji">⏳</div>
+        <h3>Carregando pedido...</h3>
+      </div>
+    );
+  }
 
   if (!order) {
     return (

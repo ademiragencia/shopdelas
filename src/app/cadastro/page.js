@@ -38,14 +38,23 @@ function CadastroInner() {
 
   const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
 
-  function submit() {
+  const [salvando, setSalvando] = useState(false);
+
+  async function submit() {
     if (!f.nome || !f.email || !f.senha) return toast("Preencha nome, e-mail e senha", "⚠️");
+    if (f.senha.length < 6) return toast("Senha de no mínimo 6 caracteres", "⚠️");
     if (tipo === "lojista" && !f.storeNome) return toast("Informe o nome da loja", "⚠️");
     if (tipo === "lojista" && !f.pixKey) return toast("Informe a chave Pix da loja", "⚠️");
     if (tipo === "entregador" && !f.veiculo) return toast("Informe seu veículo", "⚠️");
 
-    const res = register({ tipo, ...f });
+    setSalvando(true);
+    const res = await register({ tipo, ...f });
+    setSalvando(false);
     if (!res.ok) return toast(res.erro, "⚠️");
+    if (res.precisaConfirmar) {
+      toast("Enviamos um e-mail de confirmação 📧", "📧");
+      return router.push("/entrar");
+    }
     toast("Conta criada! 🎉");
     router.push(tipo === "lojista" ? "/lojista" : tipo === "entregador" ? "/entregador" : "/");
   }
@@ -151,8 +160,8 @@ function CadastroInner() {
       )}
 
       <div style={{ padding: "4px 14px 20px" }}>
-        <button className="btn btn--primary btn--block" onClick={submit}>
-          Criar conta
+        <button className="btn btn--primary btn--block" onClick={submit} disabled={salvando}>
+          {salvando ? "Criando..." : "Criar conta"}
         </button>
         <p className="helper" style={{ textAlign: "center", marginTop: 12 }}>
           Já tem conta? <Link href="/entrar" style={{ color: "var(--primary)", fontWeight: 700 }}>Entrar</Link>

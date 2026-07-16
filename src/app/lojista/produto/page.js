@@ -48,23 +48,31 @@ function ProdutoInner() {
       tamanhos: s.tamanhos.includes(t) ? s.tamanhos.filter((x) => x !== t) : [...s.tamanhos, t],
     }));
 
-  function submit() {
+  const [salvando, setSalvando] = useState(false);
+
+  async function submit() {
     if (!f.nome || !f.preco) return toast("Informe nome e preço", "⚠️");
+    setSalvando(true);
     if (editing) {
-      updateProduct(editId, {
+      await updateProduct(editId, {
         nome: f.nome,
         categoria: f.categoria,
         emoji: f.emoji,
-        preco: Number(f.preco),
         precoAntigo: f.precoAntigo ? Number(f.precoAntigo) : null,
+        preco: Number(f.preco),
         tamanhos: f.tamanhos.length ? f.tamanhos : ["Único"],
         descricao: f.descricao,
       });
       toast("Produto atualizado ✅");
     } else {
-      addProduct({ ...f, storeId: myStore.id });
+      const res = await addProduct({ ...f, storeId: myStore.id });
+      if (!res.ok) {
+        setSalvando(false);
+        return toast(res.erro || "Erro ao publicar", "⚠️");
+      }
       toast("Produto publicado! 🎉");
     }
+    setSalvando(false);
     router.push("/lojista");
   }
 
@@ -151,8 +159,8 @@ function ProdutoInner() {
       </div>
 
       <div style={{ padding: "4px 14px 24px" }}>
-        <button className="btn btn--primary btn--block" onClick={submit}>
-          {editing ? "Salvar alterações" : "Publicar produto"}
+        <button className="btn btn--primary btn--block" onClick={submit} disabled={salvando}>
+          {salvando ? "Salvando..." : editing ? "Salvar alterações" : "Publicar produto"}
         </button>
       </div>
     </>

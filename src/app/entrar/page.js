@@ -13,13 +13,18 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
 
-  function submit() {
+  const [entrando, setEntrando] = useState(false);
+
+  async function submit() {
     if (!email || !senha) return toast("Preencha e-mail e senha", "⚠️");
-    const res = login(email, senha);
+    setEntrando(true);
+    const res = await login(email, senha);
+    setEntrando(false);
     if (!res.ok) return toast(res.erro, "⚠️");
-    toast(`Bem-vindo, ${res.user.nome.split(" ")[0]}!`);
+    const nome = res.user?.nome?.split(" ")[0] || "";
+    toast(`Bem-vindo, ${nome}!`);
     router.push(
-      res.user.tipo === "lojista" ? "/lojista" : res.user.tipo === "entregador" ? "/entregador" : "/perfil"
+      res.user?.tipo === "lojista" ? "/lojista" : res.user?.tipo === "entregador" ? "/entregador" : "/perfil"
     );
   }
 
@@ -45,8 +50,8 @@ export default function LoginPage() {
           <label>Senha</label>
           <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="••••••" />
         </div>
-        <button className="btn btn--primary btn--block" onClick={submit} style={{ marginTop: 6 }}>
-          Entrar
+        <button className="btn btn--primary btn--block" onClick={submit} style={{ marginTop: 6 }} disabled={entrando}>
+          {entrando ? "Entrando..." : "Entrar"}
         </button>
       </div>
 

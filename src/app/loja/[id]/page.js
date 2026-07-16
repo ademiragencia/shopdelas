@@ -10,9 +10,18 @@ import { useStore } from "@/lib/store";
 export default function StorePage() {
   const { id } = useParams();
   const router = useRouter();
-  const { getStore, productsByStore } = useStore();
+  const { getStore, productsByStore, ready } = useStore();
   const store = getStore(id);
   const items = productsByStore(id);
+
+  if (!store && !ready) {
+    return (
+      <div className="empty">
+        <div className="empty__emoji">⏳</div>
+        <h3>Carregando loja...</h3>
+      </div>
+    );
+  }
 
   if (!store) {
     return (

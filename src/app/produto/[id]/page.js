@@ -10,7 +10,7 @@ import { formatBRL, storeAvatar } from "@/lib/data";
 export default function ProductPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { addToCart, toggleFavorite, isFavorite, count, getProduct, getStore } = useStore();
+  const { addToCart, toggleFavorite, isFavorite, count, getProduct, getStore, ready } = useStore();
   const product = getProduct(id);
   const toast = useToast();
 
@@ -19,6 +19,14 @@ export default function ProductPage() {
   const [qtd, setQtd] = useState(1);
 
   if (!product) {
+    if (!ready) {
+      return (
+        <div className="empty">
+          <div className="empty__emoji">⏳</div>
+          <h3>Carregando produto...</h3>
+        </div>
+      );
+    }
     return (
       <div className="empty">
         <div className="empty__emoji">🫥</div>

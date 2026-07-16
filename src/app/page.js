@@ -12,7 +12,7 @@ export default function Home() {
   const [cat, setCat] = useState("todos");
   const [q, setQ] = useState("");
   const router = useRouter();
-  const { count, products, stores } = useStore();
+  const { count, products, stores, ready } = useStore();
 
   const filtered = useMemo(() => {
     let list = products;
@@ -139,7 +139,12 @@ export default function Home() {
             {cat === "todos" ? "Ofertas relâmpago 🔥" : categories.find((c) => c.id === cat)?.nome}
           </span>
         </div>
-        {filtered.length === 0 ? (
+        {!ready ? (
+          <div className="empty">
+            <div className="empty__emoji">⏳</div>
+            <h3>Carregando ofertas...</h3>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="empty">
             <div className="empty__emoji">🔎</div>
             <h3>Nada encontrado</h3>

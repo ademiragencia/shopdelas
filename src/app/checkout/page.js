@@ -17,8 +17,9 @@ const ENTREGA_METODOS = [
 export default function CheckoutPage() {
   const router = useRouter();
   const toast = useToast();
-  const { state, subtotal, frete, total, setAddress, placeOrder, getStore } = useStore();
+  const { state, subtotal, frete, total, setAddress, placeOrder, getStore, currentUser } = useStore();
   const cart = state.cart;
+  const [enviando, setEnviando] = useState(false);
 
   const [form, setForm] = useState(
     state.address || { nome: "", rua: "", numero: "", bairro: "", cidade: "Campo Grande", cep: "" }
@@ -63,9 +64,13 @@ export default function CheckoutPage() {
     );
   }
 
-  function finalizar() {
+  async function finalizar() {
     if (!form.nome || !form.rua || !form.numero || !form.bairro) {
       return toast("Preencha o endereço de entrega", "⚠️");
+    }
+    if (!currentUser) {
+      toast("Entre na sua conta para finalizar", "🔒");
+      return router.push("/entrar");
     }
     setAddress(form);
 
@@ -89,16 +94,12 @@ export default function CheckoutPage() {
             pago: false,
           };
 
-    const order = placeOrder({
-      itens: cart,
-      subtotal,
-      frete,
-      total,
-      endereco: form,
-      pagamento,
-    });
+    setEnviando(true);
+    const res = await placeOrder({ subtotal, frete, total, endereco: form, pagamento });
+    setEnviando(false);
+    if (!res.ok) return toast(res.erro || "Não foi possível criar o pedido", "⚠️");
     toast("Pedido confirmado! 🎉");
-    router.push(`/pedido/${order.id}`);
+    router.push(`/pedido/${res.codigo}`);
   }
 
   return (
@@ -219,8 +220,8 @@ export default function CheckoutPage() {
       </div>
 
       <div style={{ padding: "4px 14px 30px" }}>
-        <button className="btn btn--primary btn--block" onClick={finalizar}>
-          {modo === "pix_online" ? "Já paguei · Confirmar pedido" : "Confirmar pedido"} · {formatBRL(total)}
+        <button className="btn btn--primary btn--block" onClick={finalizar} disabled={enviando}>
+          {enviando ? "Enviando..." : (modo === "pix_online" ? "Já paguei · Confirmar pedido" : "Confirmar pedido")} · {formatBRL(total)}
         </button>
       </div>
     </>
