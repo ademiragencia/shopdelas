@@ -640,6 +640,42 @@ img {
   opacity: 0.5;
   filter: grayscale(0.3);
 }
+.btn--google {
+  background: #fff;
+  color: #3c4043;
+  border: 1.5px solid var(--line);
+  gap: 10px;
+}
+.g-ic {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: conic-gradient(from -45deg, #ea4335 0 25%, #fbbc05 0 50%, #34a853 0 75%, #4285f4 0);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 13px;
+  font-family: Arial, sans-serif;
+}
+.ou-divisor {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 14px 0;
+}
+.ou-divisor::before,
+.ou-divisor::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.ou-divisor span {
+  padding: 0 12px;
+}
 
 /* ===== Cart ===== */
 .list {

@@ -20,7 +20,14 @@ function CadastroInner() {
   const router = useRouter();
   const toast = useToast();
   const params = useSearchParams();
-  const { register } = useStore();
+  const { register, loginGoogle } = useStore();
+
+  async function entrarGoogle() {
+    const res = await loginGoogle();
+    if (!res.ok) return toast(res.erro, "⚠️");
+    toast("Conta conectada! 🎉");
+    router.push(res.user?.tipo === "lojista" ? "/lojista" : res.user?.tipo === "entregador" ? "/entregador" : "/");
+  }
 
   const [tipo, setTipo] = useState(params.get("tipo") || "cliente");
   const [f, setF] = useState({
@@ -192,6 +199,11 @@ function CadastroInner() {
       <div style={{ padding: "4px 14px 20px" }}>
         <button className="btn btn--primary btn--block" onClick={submit} disabled={salvando}>
           {salvando ? "Criando..." : "Criar conta"}
+        </button>
+
+        <div className="ou-divisor"><span>ou</span></div>
+        <button className="btn btn--google btn--block" onClick={entrarGoogle}>
+          <span className="g-ic">G</span> Continuar com Google (cliente)
         </button>
         <p className="helper" style={{ textAlign: "center", marginTop: 12 }}>
           Já tem conta? <Link href="/entrar" style={{ color: "var(--primary)", fontWeight: 700 }}>Entrar</Link>

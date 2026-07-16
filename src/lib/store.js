@@ -6,6 +6,8 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "firebase/auth";
 import {
   collection,
@@ -229,6 +231,36 @@ export function StoreProvider({ children }) {
     }
   };
 
+  const loginGoogle = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const cred = await signInWithPopup(auth, provider);
+      const uid = cred.user.uid;
+      const ref = doc(db, "profiles", uid);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        const novo = {
+          tipo: "cliente",
+          nome: cred.user.displayName || "Cliente",
+          email: cred.user.email || null,
+          online: false,
+          rating: 5,
+          emoji: "🛵",
+          createdAt: serverTimestamp(),
+        };
+        await setDoc(ref, novo);
+        return { ok: true, user: { id: uid, ...novo } };
+      }
+      return { ok: true, user: { id: uid, ...snap.data() } };
+    } catch (e) {
+      const code = e.code || e.message || "";
+      if (String(code).includes("popup-closed") || String(code).includes("cancelled")) {
+        return { ok: false, erro: "Login cancelado" };
+      }
+      return { ok: false, erro: traduzErro(code) };
+    }
+  };
+
   const logout = async () => {
     await signOut(auth);
     setProfile(null);
@@ -355,7 +387,7 @@ export function StoreProvider({ children }) {
       toggleFavorite, isFavorite: (id) => favorites.includes(id),
       setAddress,
       currentUser, myStore,
-      register, login, logout,
+      register, login, loginGoogle, logout,
       addProduct, updateProduct, deleteProduct, updateStore, ordersForStore,
       setRiderOnline, ordersForRider, advanceOrder, updateRiderLocation,
       placeOrder, getOrder,

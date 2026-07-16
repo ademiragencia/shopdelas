@@ -9,9 +9,18 @@ import { useToast } from "@/components/Toast";
 export default function LoginPage() {
   const router = useRouter();
   const toast = useToast();
-  const { login } = useStore();
+  const { login, loginGoogle } = useStore();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+
+  async function entrarGoogle() {
+    const res = await loginGoogle();
+    if (!res.ok) return toast(res.erro, "⚠️");
+    toast(`Bem-vindo, ${res.user?.nome?.split(" ")[0] || ""}!`);
+    router.push(
+      res.user?.tipo === "lojista" ? "/lojista" : res.user?.tipo === "entregador" ? "/entregador" : "/perfil"
+    );
+  }
 
   const [entrando, setEntrando] = useState(false);
 
@@ -52,6 +61,12 @@ export default function LoginPage() {
         </div>
         <button className="btn btn--primary btn--block" onClick={submit} style={{ marginTop: 6 }} disabled={entrando}>
           {entrando ? "Entrando..." : "Entrar"}
+        </button>
+
+        <div className="ou-divisor"><span>ou</span></div>
+
+        <button className="btn btn--google btn--block" onClick={entrarGoogle}>
+          <span className="g-ic">G</span> Continuar com Google
         </button>
       </div>
 
