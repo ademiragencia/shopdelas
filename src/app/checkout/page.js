@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { useToast } from "@/components/Toast";
 import { formatBRL } from "@/lib/data";
-import { qr } from "@/lib/image";
 
 const ENTREGA_METODOS = [
   { id: "cartao", label: "Cartão (maquininha)", ic: "💳" },
@@ -27,6 +26,31 @@ export default function CheckoutPage() {
   const [modo, setModo] = useState("pix_online"); // 'pix_online' | 'entrega'
   const [metodoEntrega, setMetodoEntrega] = useState("cartao");
   const [home, setHome] = useState(null);
+  const [pix, setPix] = useState(null); // { id, qr_code, qr_code_base64 }
+  const [gerando, setGerando] = useState(false);
+  const [aguardando, setAguardando] = useState(false);
+
+  // Confere o pagamento Pix no Mercado Pago a cada 4s
+  useEffect(() => {
+    if (!aguardando || !pix?.id) return;
+    const t = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/pix/status?id=${pix.id}`);
+        const d = await r.json();
+        if (d.status === "approved") {
+          clearInterval(t);
+          setAguardando(false);
+          confirmarPago();
+        } else if (d.status === "rejected" || d.status === "cancelled") {
+          clearInterval(t);
+          setAguardando(false);
+          toast("Pagamento não aprovado. Tente de novo.", "⚠️");
+        }
+      } catch {}
+    }, 4000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aguardando, pix?.id]);
 
   function usarLocalizacao() {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -42,16 +66,6 @@ export default function CheckoutPage() {
       { enableHighAccuracy: true, timeout: 15000 }
     );
   }
-
-  // Lojas presentes na sacola (para o Pix online por loja)
-  const lojasNaSacola = useMemo(() => {
-    const map = {};
-    cart.forEach((i) => {
-      if (!map[i.storeId]) map[i.storeId] = { store: getStore(i.storeId), valor: 0 };
-      map[i.storeId].valor += i.preco * i.qtd;
-    });
-    return Object.values(map).filter((x) => x.store);
-  }, [cart, getStore]);
 
   if (cart.length === 0) {
     return (
@@ -80,45 +94,75 @@ export default function CheckoutPage() {
     );
   }
 
-  async function finalizar() {
+  function validar() {
     if (!form.nome || !form.rua || !form.numero || !form.bairro) {
-      return toast("Preencha o endereço de entrega", "⚠️");
+      toast("Preencha o endereço de entrega", "⚠️");
+      return false;
     }
     if (!currentUser) {
       toast("Entre na sua conta para finalizar", "🔒");
-      return router.push("/entrar");
+      router.push("/entrar");
+      return false;
     }
+    return true;
+  }
+
+  async function criarPedido(pagamento) {
     setAddress(form);
-
-    const pagamento =
-      modo === "pix_online"
-        ? {
-            modo: "pix_online",
-            resumo: "Pix online (pago à loja)",
-            pago: true,
-            pixKeys: lojasNaSacola.map((l) => ({
-              loja: l.store.nome,
-              chave: l.store.pixKey,
-              tipo: l.store.pixTipo,
-              valor: l.valor,
-            })),
-          }
-        : {
-            modo: "entrega",
-            resumo: `Na entrega · ${ENTREGA_METODOS.find((m) => m.id === metodoEntrega)?.label}`,
-            metodo: metodoEntrega,
-            pago: false,
-          };
-
-    // fallback: centro de Campo Grande com leve deslocamento, para o mapa ter o destino
     const homeGeo = home || { lat: -20.4697 + (Math.random() - 0.5) * 0.03, lng: -54.6201 + (Math.random() - 0.5) * 0.03 };
-
-    setEnviando(true);
     const res = await placeOrder({ subtotal, frete, total, endereco: form, pagamento, home: homeGeo });
-    setEnviando(false);
-    if (!res.ok) return toast(res.erro || "Não foi possível criar o pedido", "⚠️");
-    toast("Pedido confirmado! 🎉");
+    if (!res.ok) {
+      toast(res.erro || "Não foi possível criar o pedido", "⚠️");
+      return false;
+    }
     router.push(`/pedido/${res.codigo}`);
+    return true;
+  }
+
+  async function finalizarEntrega() {
+    if (!validar()) return;
+    setEnviando(true);
+    const ok = await criarPedido({
+      modo: "entrega",
+      resumo: `Na entrega · ${ENTREGA_METODOS.find((m) => m.id === metodoEntrega)?.label}`,
+      metodo: metodoEntrega,
+      pago: false,
+    });
+    setEnviando(false);
+    if (ok) toast("Pedido confirmado! 🎉");
+  }
+
+  async function gerarPix() {
+    if (!validar()) return;
+    setGerando(true);
+    const codigo = "V" + Date.now().toString().slice(-6);
+    try {
+      const r = await fetch("/api/pix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: total, email: currentUser?.email, descricao: "Pedido Vistê", codigo }),
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        setGerando(false);
+        return toast(d.error || "Erro ao gerar Pix", "⚠️");
+      }
+      setPix({ ...d, codigo });
+      setAguardando(true);
+    } catch {
+      toast("Falha ao gerar o Pix", "⚠️");
+    }
+    setGerando(false);
+  }
+
+  async function confirmarPago() {
+    const ok = await criarPedido({
+      modo: "pix_online",
+      resumo: "Pix (Mercado Pago) — pago",
+      pago: true,
+      mpPaymentId: pix?.id,
+    });
+    if (ok) toast("Pagamento aprovado! 🎉");
   }
 
   return (
@@ -188,30 +232,43 @@ export default function CheckoutPage() {
           <span>{modo === "entrega" ? "🔘" : "⚪"}</span>
         </button>
 
-        {/* Pix online — chaves por loja */}
+        {/* Pix online — Mercado Pago */}
         {modo === "pix_online" && (
           <div style={{ marginTop: 12 }}>
-            {lojasNaSacola.map((l) => (
-              <div key={l.store.id} className="pix-box">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <strong>{l.store.emoji} {l.store.nome}</strong>
-                  <span className="price__now" style={{ fontSize: 15 }}>{formatBRL(l.valor)}</span>
-                </div>
-                <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 10 }}>
-                  <img src={qr(l.store.pixKey)} alt="QR Pix" style={{ width: 84, height: 84, borderRadius: 8, border: "1px solid var(--line)" }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: "var(--muted)" }}>Chave Pix ({l.store.pixTipo})</div>
-                    <div style={{ fontWeight: 700, wordBreak: "break-all", fontSize: 14 }}>{l.store.pixKey}</div>
-                    <button className="btn btn--outline" style={{ padding: "8px 12px", marginTop: 8, fontSize: 13 }} onClick={() => copiar(l.store.pixKey)}>
-                      📋 Copiar chave
-                    </button>
+            {!pix ? (
+              <p className="helper" style={{ padding: "0 0 2px" }}>
+                Ao gerar, você paga com o app do seu banco escaneando o QR ou com o Pix copia-e-cola. O pedido é confirmado <strong>assim que o pagamento cair</strong>.
+              </p>
+            ) : (
+              <div className="pix-box">
+                <div style={{ textAlign: "center" }}>
+                  {pix.qr_code_base64 ? (
+                    <img
+                      src={`data:image/png;base64,${pix.qr_code_base64}`}
+                      alt="QR Code Pix"
+                      style={{ width: 190, height: 190, margin: "0 auto", borderRadius: 8 }}
+                    />
+                  ) : (
+                    <div style={{ padding: 20 }}>QR indisponível — use o copia-e-cola abaixo</div>
+                  )}
+                  <div style={{ fontWeight: 800, marginTop: 6 }}>{formatBRL(total)}</div>
+                  <div style={{ color: aguardando ? "var(--primary)" : "var(--accent)", fontSize: 13, fontWeight: 700, marginTop: 4 }}>
+                    {aguardando ? "⏳ Aguardando pagamento..." : "Pronto"}
                   </div>
                 </div>
+                {pix.qr_code && (
+                  <>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 12 }}>Pix copia-e-cola</div>
+                    <div style={{ fontSize: 11, wordBreak: "break-all", background: "#fff", border: "1px solid var(--line)", borderRadius: 8, padding: 8, marginTop: 4 }}>
+                      {pix.qr_code}
+                    </div>
+                    <button className="btn btn--outline btn--block" style={{ marginTop: 8, fontSize: 13, padding: "10px" }} onClick={() => copiar(pix.qr_code)}>
+                      📋 Copiar código Pix
+                    </button>
+                  </>
+                )}
               </div>
-            ))}
-            <p className="helper" style={{ padding: "6px 0 0" }}>
-              Você paga direto para cada loja. Ao confirmar, o pedido já entra como <strong>pago</strong>.
-            </p>
+            )}
           </div>
         )}
 
@@ -246,9 +303,19 @@ export default function CheckoutPage() {
       </div>
 
       <div style={{ padding: "4px 14px 30px" }}>
-        <button className="btn btn--primary btn--block" onClick={finalizar} disabled={enviando}>
-          {enviando ? "Enviando..." : (modo === "pix_online" ? "Já paguei · Confirmar pedido" : "Confirmar pedido")} · {formatBRL(total)}
-        </button>
+        {modo === "entrega" ? (
+          <button className="btn btn--primary btn--block" onClick={finalizarEntrega} disabled={enviando}>
+            {enviando ? "Enviando..." : "Confirmar pedido"} · {formatBRL(total)}
+          </button>
+        ) : !pix ? (
+          <button className="btn btn--primary btn--block" onClick={gerarPix} disabled={gerando}>
+            {gerando ? "Gerando Pix..." : `Gerar Pix · ${formatBRL(total)}`}
+          </button>
+        ) : (
+          <button className="btn btn--outline btn--block" disabled>
+            {aguardando ? "⏳ Aguardando pagamento..." : "Processando..."}
+          </button>
+        )}
       </div>
     </>
   );

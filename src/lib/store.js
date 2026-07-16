@@ -188,6 +188,7 @@ export function StoreProvider({ children }) {
       await setDoc(doc(db, "profiles", uid), {
         tipo: d.tipo,
         nome: d.nome,
+        email: d.email || null,
         veiculo: d.veiculo || null,
         placa: d.placa || null,
         online: d.tipo === "entregador",

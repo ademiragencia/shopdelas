@@ -140,8 +140,8 @@ export default function OrderTrackingPage() {
           <span>{order.pagamento?.resumo}</span>
         </div>
         {order.pagamento?.modo === "pix_online" && (
-          <div className="notice" style={{ borderRadius: 10, marginTop: 8 }}>
-            ✅ Pago via Pix online para {order.pagamento.pixKeys?.length > 1 ? "as lojas" : "a loja"}
+          <div className="notice" style={{ borderRadius: 10, marginTop: 8, background: "#e6f6ee", color: "var(--accent)" }}>
+            ✅ Pagamento Pix confirmado
           </div>
         )}
         <div className="summary__row summary__row--total">
