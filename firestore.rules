@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isStoreOwner(storeId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
+    }
+
+    // Perfis: leitura pública (nome do entregador etc.); escreve só o próprio dono
+    match /profiles/{uid} {
+      allow read: if true;
+      allow create, update: if request.auth.uid == uid;
+    }
+
+    // Lojas: leitura pública; cria/edita só o dono
+    match /stores/{id} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // Produtos: leitura pública; cria/edita só o dono da loja
+    match /products/{id} {
+      allow read: if true;
+      allow create: if isStoreOwner(request.resource.data.storeId);
+      allow update, delete: if isStoreOwner(resource.data.storeId);
+    }
+
+    // Pedidos: vê o cliente, o entregador da corrida, ou o lojista envolvido
+    match /orders/{id} {
+      allow read: if signedIn() && (
+        resource.data.clienteId == request.auth.uid ||
+        resource.data.riderId == request.auth.uid ||
+        (resource.data.sellerIds is list && request.auth.uid in resource.data.sellerIds)
+      );
+      allow create: if signedIn() && request.resource.data.clienteId == request.auth.uid;
+      // Só o entregador da corrida atualiza status/localização
+      allow update: if signedIn() && resource.data.riderId == request.auth.uid;
+    }
+  }
+}

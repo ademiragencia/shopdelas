@@ -12,12 +12,12 @@ export const categories = [
 ];
 
 export const stores = [
-  { id: "urban", nome: "Urban Style", emoji: "🧥", categoria: "masculino", rating: 4.8, avaliacoes: 1204, tempo: "30-45 min", frete: 0, cupom: "Frete grátis acima de R$99", selo: "Loja Oficial", pixKey: "contato@urbanstyle.com.br", pixTipo: "E-mail", coord: { x: 22, y: 26 } },
-  { id: "bella", nome: "Bella Moda", emoji: "👗", categoria: "feminino", rating: 4.9, avaliacoes: 2380, tempo: "25-40 min", frete: 7.9, cupom: "10% OFF na 1ª compra", selo: "Top Vendas", pixKey: "67 99123-4567", pixTipo: "Telefone", coord: { x: 74, y: 20 } },
-  { id: "kids", nome: "Mundo Kids", emoji: "🧸", categoria: "infantil", rating: 4.7, avaliacoes: 640, tempo: "40-60 min", frete: 9.9, cupom: null, selo: null, pixKey: "31.402.155/0001-70", pixTipo: "CNPJ", coord: { x: 18, y: 74 } },
-  { id: "sneaker", nome: "SneakerBox", emoji: "👟", categoria: "calcados", rating: 4.9, avaliacoes: 3110, tempo: "35-50 min", frete: 0, cupom: "Frete grátis", selo: "Loja Oficial", pixKey: "pix@sneakerbox.com", pixTipo: "E-mail", coord: { x: 80, y: 70 } },
-  { id: "fit", nome: "FitPro Sports", emoji: "🏃", categoria: "esporte", rating: 4.6, avaliacoes: 890, tempo: "30-45 min", frete: 6.9, cupom: null, selo: null, pixKey: "67 98888-2020", pixTipo: "Telefone", coord: { x: 30, y: 50 } },
-  { id: "acess", nome: "Charme Acessórios", emoji: "👜", categoria: "acessorios", rating: 4.8, avaliacoes: 1520, tempo: "20-35 min", frete: 5.9, cupom: "Leve 3 pague 2", selo: "Top Vendas", pixKey: "charme.acessorios@pix.com", pixTipo: "E-mail", coord: { x: 68, y: 48 } },
+  { id: "urban", nome: "Urban Style", emoji: "🧥", categoria: "masculino", rating: 4.8, avaliacoes: 1204, tempo: "30-45 min", frete: 0, cupom: "Frete grátis acima de R$99", selo: "Loja Oficial", pixKey: "contato@urbanstyle.com.br", pixTipo: "E-mail", coord: { x: 22, y: 26 }, lat: -20.464, lng: -54.61 },
+  { id: "bella", nome: "Bella Moda", emoji: "👗", categoria: "feminino", rating: 4.9, avaliacoes: 2380, tempo: "25-40 min", frete: 7.9, cupom: "10% OFF na 1ª compra", selo: "Top Vendas", pixKey: "67 99123-4567", pixTipo: "Telefone", coord: { x: 74, y: 20 }, lat: -20.455, lng: -54.63 },
+  { id: "kids", nome: "Mundo Kids", emoji: "🧸", categoria: "infantil", rating: 4.7, avaliacoes: 640, tempo: "40-60 min", frete: 9.9, cupom: null, selo: null, pixKey: "31.402.155/0001-70", pixTipo: "CNPJ", coord: { x: 18, y: 74 }, lat: -20.482, lng: -54.605 },
+  { id: "sneaker", nome: "SneakerBox", emoji: "👟", categoria: "calcados", rating: 4.9, avaliacoes: 3110, tempo: "35-50 min", frete: 0, cupom: "Frete grátis", selo: "Loja Oficial", pixKey: "pix@sneakerbox.com", pixTipo: "E-mail", coord: { x: 80, y: 70 }, lat: -20.47, lng: -54.64 },
+  { id: "fit", nome: "FitPro Sports", emoji: "🏃", categoria: "esporte", rating: 4.6, avaliacoes: 890, tempo: "30-45 min", frete: 6.9, cupom: null, selo: null, pixKey: "67 98888-2020", pixTipo: "Telefone", coord: { x: 30, y: 50 }, lat: -20.46, lng: -54.62 },
+  { id: "acess", nome: "Charme Acessórios", emoji: "👜", categoria: "acessorios", rating: 4.8, avaliacoes: 1520, tempo: "20-35 min", frete: 5.9, cupom: "Leve 3 pague 2", selo: "Top Vendas", pixKey: "charme.acessorios@pix.com", pixTipo: "E-mail", coord: { x: 68, y: 48 }, lat: -20.475, lng: -54.625 },
 ];
 
 // Ponto de entrega padrão do cliente no mapa (0..100)

@@ -1,102 +1,75 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "./supabase";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from "firebase/auth";
+import {
+  collection,
+  doc,
+  addDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  onSnapshot,
+  serverTimestamp,
+} from "firebase/firestore";
+import { auth, db } from "./firebase";
 import { tile } from "./image";
+import { stores as demoStores, products as demoProducts } from "./data";
 
 const StoreContext = createContext(null);
 const LOCAL_KEY = "viste:local:v1";
+const uid6 = () => "V" + Date.now().toString().slice(-6);
 
-// ---------- Normalizadores (DB -> formato da UI) ----------
-function normStore(r) {
+function normProduct(p) {
   return {
-    id: r.id,
-    ownerId: r.owner_id,
-    nome: r.nome,
-    emoji: r.emoji,
-    categoria: r.categoria,
-    rating: Number(r.rating || 5),
-    avaliacoes: r.avaliacoes || 0,
-    tempo: r.tempo,
-    frete: Number(r.frete || 0),
-    cupom: r.cupom,
-    selo: r.selo,
-    pixKey: r.pix_key,
-    pixTipo: r.pix_tipo,
-    coord: r.coord || { x: 50, y: 40 },
-    lat: r.lat ?? null,
-    lng: r.lng ?? null,
-  };
-}
-function normProduct(r) {
-  return {
-    id: r.id,
-    storeId: r.store_id,
-    nome: r.nome,
-    emoji: r.emoji,
-    categoria: r.categoria,
-    preco: Number(r.preco),
-    precoAntigo: r.preco_antigo != null ? Number(r.preco_antigo) : null,
-    tamanhos: r.tamanhos || ["Único"],
-    cores: r.cores || [],
-    descricao: r.descricao || r.nome,
-    vendidos: r.vendidos || 0,
+    ...p,
+    preco: Number(p.preco),
+    precoAntigo: p.precoAntigo != null ? Number(p.precoAntigo) : null,
+    tamanhos: p.tamanhos?.length ? p.tamanhos : ["Único"],
+    cores: p.cores || [],
+    vendidos: p.vendidos || 0,
     parcelas: 3,
-    imagem: tile(r.id, r.emoji || "👕", { label: r.nome }),
+    imagem: p.imagem || tile(p.id, p.emoji || "👕", { label: p.nome }),
   };
 }
-function normOrder(r) {
-  const itens = (r.order_items || []).map((i) => ({
-    key: i.id,
-    productId: i.product_id,
-    storeId: i.store_id,
-    nome: i.nome,
-    emoji: i.emoji,
-    preco: Number(i.preco),
-    tamanho: i.tamanho,
-    cor: i.cor,
-    qtd: i.qtd,
-    imagem: tile(i.product_id || i.nome, i.emoji || "👕", { label: i.nome }),
-  }));
+function normOrder(o) {
   return {
-    id: r.id,
-    codigo: r.codigo,
-    statusIndex: r.status_index ?? 0,
-    subtotal: Number(r.subtotal || 0),
-    frete: Number(r.frete || 0),
-    total: Number(r.total || 0),
-    endereco: r.endereco,
-    pagamento: r.pagamento,
-    storeCoord: r.store_coord,
-    homeCoord: r.home_coord,
-    geo: {
-      store: r.store_lat != null ? { lat: Number(r.store_lat), lng: Number(r.store_lng) } : null,
-      home: r.home_lat != null ? { lat: Number(r.home_lat), lng: Number(r.home_lng) } : null,
-      rider: r.rider_lat != null ? { lat: Number(r.rider_lat), lng: Number(r.rider_lng) } : null,
-    },
-    criadoEm: r.created_at,
-    rider: r.rider ? { id: r.rider_id, ...r.rider } : null,
-    itens,
+    ...o,
+    statusIndex: o.statusIndex ?? 0,
+    criadoEm: o.createdAt?.toMillis ? o.createdAt.toMillis() : o.criadoEm || Date.now(),
+    rider: o.riderInfo || null,
+    itens: (o.itens || []).map((i) => ({
+      ...i,
+      key: `${i.productId}|${i.tamanho}|${i.cor}`,
+      imagem: tile(i.productId || i.nome, i.emoji || "👕", { label: i.nome }),
+    })),
   };
 }
-
-const ORDER_SELECT =
-  "*, rider:profiles!orders_rider_id_fkey(nome,veiculo,placa,rating,emoji), order_items(*)";
 
 export function StoreProvider({ children }) {
   const [ready, setReady] = useState(false);
   const [profile, setProfile] = useState(null);
-  const [stores, setStores] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [fbStores, setFbStores] = useState([]);
+  const [fbProducts, setFbProducts] = useState([]);
   const [orders, setOrders] = useState([]);
 
-  // Local (carrinho/favoritos/endereço)
   const [cart, setCart] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [address, setAddressState] = useState(null);
   const localReady = useRef(false);
+  const profileUnsub = useRef(null);
+  const ordersUnsub = useRef(null);
 
-  // ---- carregar/salvar local ----
+  // Local
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LOCAL_KEY);
@@ -116,79 +89,70 @@ export function StoreProvider({ children }) {
     } catch {}
   }, [cart, favorites, address]);
 
-  // ---- loaders ----
-  const loadCatalog = useCallback(async () => {
-    const [{ data: s }, { data: p }] = await Promise.all([
-      supabase.from("stores").select("*").order("created_at", { ascending: true }),
-      supabase.from("products").select("*").eq("ativo", true).order("created_at", { ascending: false }),
-    ]);
-    if (s) setStores(s.map(normStore));
-    if (p) setProducts(p.map(normProduct));
-  }, []);
-
-  const loadProfile = useCallback(async (userId) => {
-    if (!userId) return setProfile(null);
-    const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
-    setProfile(data || null);
-  }, []);
-
-  const loadOrders = useCallback(async (userId) => {
-    if (!userId) return setOrders([]);
-    const { data } = await supabase.from("orders").select(ORDER_SELECT).order("created_at", { ascending: false });
-    setOrders((data || []).map(normOrder));
-  }, []);
-
-  // ---- init + auth listener ----
+  // Catálogo em tempo real
   useEffect(() => {
-    let sub;
-    (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const uid = session?.user?.id;
-      await Promise.all([loadCatalog(), loadProfile(uid), loadOrders(uid)]);
-      setReady(true);
-      sub = supabase.auth.onAuthStateChange(async (_e, sess) => {
-        const id = sess?.user?.id;
-        await Promise.all([loadProfile(id), loadOrders(id)]);
-      }).data.subscription;
-    })();
-    return () => sub?.unsubscribe();
-  }, [loadCatalog, loadProfile, loadOrders]);
+    const us = onSnapshot(
+      collection(db, "stores"),
+      (snap) => setFbStores(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      () => {}
+    );
+    const up = onSnapshot(
+      collection(db, "products"),
+      (snap) => setFbProducts(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      () => {}
+    );
+    return () => {
+      us();
+      up();
+    };
+  }, []);
 
-  // ---- realtime ----
+  // Auth + perfil
   useEffect(() => {
-    if (!ready) return;
-    const ch = supabase
-      .channel("viste-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () =>
-        loadOrders(profile?.id)
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadCatalog())
-      .on("postgres_changes", { event: "*", schema: "public", table: "stores" }, () => loadCatalog())
-      .subscribe();
-    return () => supabase.removeChannel(ch);
-  }, [ready, profile?.id, loadOrders, loadCatalog]);
-
-  // ---- carrinho ----
-  const addToCart = (product, tamanho, cor, qtd = 1) => {
-    const key = `${product.id}|${tamanho}|${cor}`;
-    setCart((c) => {
-      const ex = c.find((i) => i.key === key);
-      if (ex) return c.map((i) => (i.key === key ? { ...i, qtd: i.qtd + qtd } : i));
-      return [
-        ...c,
-        { key, productId: product.id, nome: product.nome, emoji: product.emoji, preco: product.preco, imagem: product.imagem, storeId: product.storeId, tamanho, cor, qtd },
-      ];
+    const unsub = onAuthStateChanged(auth, (user) => {
+      profileUnsub.current?.();
+      ordersUnsub.current?.();
+      if (!user) {
+        setProfile(null);
+        setOrders([]);
+        setReady(true);
+        return;
+      }
+      profileUnsub.current = onSnapshot(doc(db, "profiles", user.uid), (d) => {
+        const prof = d.exists() ? { id: user.uid, ...d.data() } : { id: user.uid, tipo: "cliente", nome: "" };
+        setProfile(prof);
+        setupOrders(prof);
+        setReady(true);
+      });
     });
-  };
-  const setQtd = (key, qtd) =>
-    setCart((c) => c.map((i) => (i.key === key ? { ...i, qtd } : i)).filter((i) => i.qtd > 0));
-  const removeFromCart = (key) => setCart((c) => c.filter((i) => i.key !== key));
-  const clearCart = () => setCart([]);
+    return () => {
+      unsub();
+      profileUnsub.current?.();
+      ordersUnsub.current?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const toggleFavorite = (id) =>
-    setFavorites((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
+  function setupOrders(prof) {
+    ordersUnsub.current?.();
+    let q;
+    if (prof.tipo === "entregador") q = query(collection(db, "orders"), where("riderId", "==", prof.id));
+    else if (prof.tipo === "lojista") q = query(collection(db, "orders"), where("sellerIds", "array-contains", prof.id));
+    else q = query(collection(db, "orders"), where("clienteId", "==", prof.id));
+    ordersUnsub.current = onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => normOrder({ id: d.id, ...d.data() }));
+        list.sort((a, b) => b.criadoEm - a.criadoEm);
+        setOrders(list);
+      },
+      () => {}
+    );
+  }
 
-  // ---- catálogo helpers ----
+  // Catálogo mesclado (demo + Firebase)
+  const stores = useMemo(() => [...demoStores, ...fbStores], [fbStores]);
+  const products = useMemo(() => [...fbProducts.map(normProduct), ...demoProducts], [fbProducts]);
   const getStore = (id) => stores.find((s) => s.id === id);
   const getProduct = (id) => products.find((p) => p.id === id);
   const productsByStore = (id) => products.filter((p) => p.storeId === id);
@@ -200,148 +164,185 @@ export function StoreProvider({ children }) {
   const currentUser = profile;
   const myStore = profile?.id ? stores.find((s) => s.ownerId === profile.id) : null;
 
-  // ---- auth ----
-  const register = async (d) => {
-    const { data, error } = await supabase.auth.signUp({
-      email: d.email,
-      password: d.senha,
-      options: {
-        data: {
-          tipo: d.tipo,
-          nome: d.nome,
-          veiculo: d.veiculo || null,
-          placa: d.placa || null,
-          online: d.tipo === "entregador",
-          emoji: "🛵",
-        },
-      },
+  // Carrinho / favoritos
+  const addToCart = (product, tamanho, cor, qtd = 1) => {
+    const key = `${product.id}|${tamanho}|${cor}`;
+    setCart((c) => {
+      const ex = c.find((i) => i.key === key);
+      if (ex) return c.map((i) => (i.key === key ? { ...i, qtd: i.qtd + qtd } : i));
+      return [...c, { key, productId: product.id, nome: product.nome, emoji: product.emoji, preco: product.preco, imagem: product.imagem, storeId: product.storeId, tamanho, cor, qtd }];
     });
-    if (error) return { ok: false, erro: traduzErro(error.message) };
+  };
+  const setQtd = (key, qtd) => setCart((c) => c.map((i) => (i.key === key ? { ...i, qtd } : i)).filter((i) => i.qtd > 0));
+  const removeFromCart = (key) => setCart((c) => c.filter((i) => i.key !== key));
+  const clearCart = () => setCart([]);
+  const toggleFavorite = (id) => setFavorites((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
 
-    // garante sessão (se confirmação de e-mail estiver desativada)
-    let uid = data.user?.id;
-    if (!data.session) {
-      const { data: s2, error: e2 } = await supabase.auth.signInWithPassword({
-        email: d.email,
-        password: d.senha,
+  // Auth
+  const register = async (d) => {
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, d.email, d.senha);
+      const uid = cred.user.uid;
+      await setDoc(doc(db, "profiles", uid), {
+        tipo: d.tipo,
+        nome: d.nome,
+        veiculo: d.veiculo || null,
+        placa: d.placa || null,
+        online: d.tipo === "entregador",
+        rating: 5,
+        emoji: "🛵",
+        createdAt: serverTimestamp(),
       });
-      if (e2) return { ok: true, precisaConfirmar: true };
-      uid = s2.user?.id;
+      if (d.tipo === "lojista") {
+        await addDoc(collection(db, "stores"), {
+          ownerId: uid,
+          nome: d.storeNome || d.nome,
+          emoji: d.emoji || "🏬",
+          categoria: d.categoria || "feminino",
+          rating: 5,
+          avaliacoes: 0,
+          tempo: "30-50 min",
+          frete: 0,
+          cupom: null,
+          selo: "Nova loja",
+          pixKey: d.pixKey || d.email,
+          pixTipo: d.pixTipo || "E-mail",
+          coord: { x: Math.round(20 + Math.random() * 60), y: Math.round(20 + Math.random() * 40) },
+          lat: d.storeLat ?? null,
+          lng: d.storeLng ?? null,
+          createdAt: serverTimestamp(),
+        });
+      }
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, erro: traduzErro(e.code || e.message) };
     }
-
-    if (d.tipo === "lojista" && uid) {
-      await supabase.from("stores").insert({
-        owner_id: uid,
-        nome: d.storeNome || d.nome,
-        emoji: d.emoji || "🏬",
-        categoria: d.categoria || "feminino",
-        pix_key: d.pixKey || d.email,
-        pix_tipo: d.pixTipo || "E-mail",
-        coord: { x: Math.round(20 + Math.random() * 60), y: Math.round(20 + Math.random() * 40) },
-        lat: d.storeLat ?? null,
-        lng: d.storeLng ?? null,
-      });
-    }
-    await Promise.all([loadCatalog(), loadProfile(uid), loadOrders(uid)]);
-    return { ok: true };
   };
 
   const login = async (email, senha) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
-    if (error) return { ok: false, erro: traduzErro(error.message) };
-    await Promise.all([loadProfile(data.user.id), loadOrders(data.user.id)]);
-    const { data: prof } = await supabase.from("profiles").select("*").eq("id", data.user.id).maybeSingle();
-    return { ok: true, user: prof };
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, senha);
+      const snap = await getDoc(doc(db, "profiles", cred.user.uid));
+      return { ok: true, user: snap.exists() ? { id: cred.user.uid, ...snap.data() } : { tipo: "cliente" } };
+    } catch (e) {
+      return { ok: false, erro: traduzErro(e.code || e.message) };
+    }
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    await signOut(auth);
     setProfile(null);
     setOrders([]);
   };
 
-  // ---- lojista ----
+  // Lojista
   const addProduct = async (d) => {
-    const { error } = await supabase.from("products").insert({
-      store_id: d.storeId,
-      nome: d.nome,
-      emoji: d.emoji || "👕",
-      categoria: d.categoria,
-      preco: Number(d.preco),
-      preco_antigo: d.precoAntigo ? Number(d.precoAntigo) : null,
-      tamanhos: d.tamanhos?.length ? d.tamanhos : ["Único"],
-      cores: d.cores || [],
-      descricao: d.descricao || d.nome,
-    });
-    await loadCatalog();
-    return { ok: !error, erro: error?.message };
+    try {
+      await addDoc(collection(db, "products"), {
+        storeId: d.storeId,
+        nome: d.nome,
+        emoji: d.emoji || "👕",
+        categoria: d.categoria,
+        preco: Number(d.preco),
+        precoAntigo: d.precoAntigo ? Number(d.precoAntigo) : null,
+        tamanhos: d.tamanhos?.length ? d.tamanhos : ["Único"],
+        cores: d.cores || [],
+        descricao: d.descricao || d.nome,
+        vendidos: 0,
+        ativo: true,
+        createdAt: serverTimestamp(),
+      });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, erro: e.message };
+    }
   };
   const updateProduct = async (id, d) => {
-    await supabase.from("products").update({
+    await updateDoc(doc(db, "products", id), {
       nome: d.nome,
       emoji: d.emoji,
       categoria: d.categoria,
       preco: Number(d.preco),
-      preco_antigo: d.precoAntigo ? Number(d.precoAntigo) : null,
+      precoAntigo: d.precoAntigo ? Number(d.precoAntigo) : null,
       tamanhos: d.tamanhos?.length ? d.tamanhos : ["Único"],
       descricao: d.descricao,
-    }).eq("id", id);
-    await loadCatalog();
+    });
   };
-  const deleteProduct = async (id) => {
-    await supabase.from("products").delete().eq("id", id);
-    await loadCatalog();
-  };
-  const updateStore = async (id, d) => {
-    await supabase.from("stores").update(d).eq("id", id);
-    await loadCatalog();
-  };
+  const deleteProduct = async (id) => deleteDoc(doc(db, "products", id));
+  const updateStore = async (id, d) => updateDoc(doc(db, "stores", id), d);
+  const ordersForStore = (storeId) => orders.filter((o) => o.itens.some((i) => i.storeId === storeId));
 
-  // ---- entregador ----
+  // Entregador
   const setRiderOnline = async (online) => {
     if (!profile) return;
     setProfile((p) => ({ ...p, online }));
-    await supabase.from("profiles").update({ online }).eq("id", profile.id);
+    try {
+      await updateDoc(doc(db, "profiles", profile.id), { online });
+    } catch {}
   };
   const ordersForRider = (riderId) => orders.filter((o) => o.rider?.id === riderId);
   const advanceOrder = async (id) => {
-    await supabase.rpc("advance_order", { p_order_id: id });
-    await loadOrders(profile?.id);
+    const o = orders.find((x) => x.id === id);
+    const next = Math.min((o?.statusIndex ?? 0) + 1, 4);
+    await updateDoc(doc(db, "orders", id), { statusIndex: next });
   };
-
-  const ordersForStore = (storeId) => orders.filter((o) => o.itens.some((i) => i.storeId === storeId));
-
-  // ---- pedido ----
-  const placeOrder = async (base) => {
-    const loja = getStore(cart[0]?.storeId);
-    const storeCoord = loja?.coord || { x: 30, y: 30 };
-    const { data, error } = await supabase.rpc("place_order", {
-      p_items: cart.map((i) => ({
-        productId: i.productId, storeId: i.storeId, nome: i.nome, emoji: i.emoji,
-        preco: i.preco, tamanho: i.tamanho, cor: i.cor, qtd: i.qtd,
-      })),
-      p_subtotal: base.subtotal,
-      p_frete: base.frete,
-      p_total: base.total,
-      p_endereco: base.endereco,
-      p_pagamento: base.pagamento,
-      p_store_coord: storeCoord,
-      p_store_lat: loja?.lat ?? null,
-      p_store_lng: loja?.lng ?? null,
-      p_home_lat: base.home?.lat ?? null,
-      p_home_lng: base.home?.lng ?? null,
-    });
-    if (error) return { ok: false, erro: traduzErro(error.message) };
-    clearCart();
-    await loadOrders(profile?.id);
-    return { ok: true, codigo: data.codigo, id: data.id };
-  };
-
   const updateRiderLocation = async (orderId, lat, lng) => {
-    await supabase.rpc("update_rider_location", { p_order_id: orderId, p_lat: lat, p_lng: lng });
+    try {
+      await updateDoc(doc(db, "orders", orderId), { "geo.rider": { lat, lng } });
+      if (profile) await updateDoc(doc(db, "profiles", profile.id), { lat, lng });
+    } catch {}
+  };
+
+  // Pedido
+  const placeOrder = async (base) => {
+    if (!currentUser) return { ok: false, erro: "Entre na sua conta para finalizar" };
+    const loja = getStore(cart[0]?.storeId);
+    const sellerIds = [...new Set(cart.map((i) => getStore(i.storeId)?.ownerId).filter(Boolean))];
+
+    // Atribui um entregador online (no cliente)
+    let riderId = null;
+    let riderInfo = null;
+    try {
+      const qs = await getDocs(query(collection(db, "profiles"), where("tipo", "==", "entregador"), where("online", "==", true)));
+      const riders = qs.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (riders.length) {
+        const r = riders[Math.floor(Math.random() * riders.length)];
+        riderId = r.id;
+        riderInfo = { id: r.id, nome: r.nome, veiculo: r.veiculo, placa: r.placa, rating: r.rating || 5, emoji: r.emoji || "🛵" };
+      }
+    } catch {}
+
+    const storePos = loja?.lat != null ? { lat: loja.lat, lng: loja.lng } : null;
+    const geo = { store: storePos, home: base.home || null, rider: storePos };
+    const codigo = uid6();
+    const payload = {
+      codigo,
+      clienteId: currentUser.id,
+      riderId,
+      riderInfo,
+      sellerIds,
+      statusIndex: 0,
+      subtotal: base.subtotal,
+      frete: base.frete,
+      total: base.total,
+      endereco: base.endereco,
+      pagamento: base.pagamento,
+      storeCoord: loja?.coord || null,
+      geo,
+      itens: cart.map((i) => ({ productId: i.productId, storeId: i.storeId, nome: i.nome, emoji: i.emoji, preco: i.preco, tamanho: i.tamanho, cor: i.cor, qtd: i.qtd })),
+      createdAt: serverTimestamp(),
+    };
+    try {
+      const ref = await addDoc(collection(db, "orders"), payload);
+      // otimista (evita "não encontrado" antes do snapshot)
+      setOrders((prev) => [normOrder({ id: ref.id, ...payload, createdAt: { toMillis: () => Date.now() } }), ...prev]);
+      clearCart();
+      return { ok: true, codigo, id: ref.id };
+    } catch (e) {
+      return { ok: false, erro: e.message };
+    }
   };
   const getOrder = (x) => orders.find((o) => o.id === x || o.codigo === x);
-
   const setAddress = (a) => setAddressState(a);
 
   const api = useMemo(
@@ -355,9 +356,9 @@ export function StoreProvider({ children }) {
       setAddress,
       currentUser, myStore,
       register, login, logout,
-      addProduct, updateProduct, deleteProduct, updateStore,
-      setRiderOnline, ordersForRider, advanceOrder, ordersForStore,
-      placeOrder, getOrder, updateRiderLocation,
+      addProduct, updateProduct, deleteProduct, updateStore, ordersForStore,
+      setRiderOnline, ordersForRider, advanceOrder, updateRiderLocation,
+      placeOrder, getOrder,
     }),
     [ready, cart, favorites, orders, address, stores, products, profile]
   );
@@ -365,13 +366,14 @@ export function StoreProvider({ children }) {
   return <StoreContext.Provider value={api}>{children}</StoreContext.Provider>;
 }
 
-function traduzErro(msg = "") {
-  const m = msg.toLowerCase();
-  if (m.includes("already registered") || m.includes("already been")) return "E-mail já cadastrado";
-  if (m.includes("invalid login")) return "E-mail ou senha inválidos";
-  if (m.includes("email not confirmed")) return "Confirme seu e-mail para entrar";
-  if (m.includes("password")) return "Senha muito curta (mín. 6 caracteres)";
-  return msg || "Algo deu errado";
+function traduzErro(code = "") {
+  const c = String(code).toLowerCase();
+  if (c.includes("email-already")) return "E-mail já cadastrado";
+  if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found")) return "E-mail ou senha inválidos";
+  if (c.includes("weak-password")) return "Senha muito curta (mín. 6 caracteres)";
+  if (c.includes("invalid-email")) return "E-mail inválido";
+  if (c.includes("configuration-not-found") || c.includes("api-key")) return "Firebase ainda não configurado";
+  return "Não foi possível concluir. Tente novamente.";
 }
 
 export function useStore() {
