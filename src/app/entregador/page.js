@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import MapTrack from "@/components/MapTrack";
@@ -8,10 +10,36 @@ import { useStore, ORDER_STEPS } from "@/lib/store";
 import { useToast } from "@/components/Toast";
 import { formatBRL } from "@/lib/data";
 
+const LiveMap = dynamic(() => import("@/components/LiveMap"), { ssr: false });
+
 export default function EntregadorPage() {
   const router = useRouter();
   const toast = useToast();
-  const { currentUser, setRiderOnline, ordersForRider, advanceOrder } = useStore();
+  const { currentUser, setRiderOnline, ordersForRider, advanceOrder, updateRiderLocation } = useStore();
+  const [pos, setPos] = useState(null);
+  const [sharing, setSharing] = useState(false);
+  const watchRef = useRef(null);
+
+  const corridasAll = currentUser ? ordersForRider(currentUser.id) : [];
+  const ativasIds = corridasAll.filter((o) => o.statusIndex < 4).map((o) => o.id).join(",");
+
+  useEffect(() => {
+    if (!sharing) return;
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    watchRef.current = navigator.geolocation.watchPosition(
+      (p) => {
+        const c = { lat: p.coords.latitude, lng: p.coords.longitude };
+        setPos(c);
+        ativasIds.split(",").filter(Boolean).forEach((id) => updateRiderLocation(id, c.lat, c.lng));
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+    );
+    return () => {
+      if (watchRef.current != null) navigator.geolocation.clearWatch(watchRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharing, ativasIds]);
 
   if (!currentUser || currentUser.tipo !== "entregador") {
     return (
@@ -85,10 +113,31 @@ export default function EntregadorPage() {
         return (
           <div key={o.id} className="card-block">
             <div className="ocard__head">
-              <strong>Corrida #{o.id}</strong>
+              <strong>Corrida #{o.codigo}</strong>
               <span className="ostatus andamento">{step.emoji} {step.label}</span>
             </div>
-            <MapTrack order={o} />
+            {o.geo?.store && o.geo?.home ? (
+              <LiveMap
+                store={o.geo.store}
+                home={o.geo.home}
+                rider={pos || o.geo.rider || o.geo.store}
+                badge={sharing ? "🛵 Enviando sua localização" : "📍 Ative o GPS"}
+              />
+            ) : (
+              <MapTrack order={o} />
+            )}
+            {!sharing && (
+              <button
+                className="btn btn--outline btn--block"
+                style={{ marginTop: 10 }}
+                onClick={() => {
+                  setSharing(true);
+                  toast("Compartilhando localização 🛰️");
+                }}
+              >
+                📍 Compartilhar minha localização
+              </button>
+            )}
             <div style={{ marginTop: 12 }}>
               <div className="rota-line"><span>🏬</span> Retirar em <strong>Loja parceira</strong></div>
               <div className="rota-line"><span>🏠</span> Entregar para <strong>{o.endereco?.nome}</strong></div>

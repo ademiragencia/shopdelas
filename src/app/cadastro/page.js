@@ -34,9 +34,26 @@ function CadastroInner() {
     pixTipo: "E-mail",
     veiculo: "",
     placa: "",
+    storeLat: null,
+    storeLng: null,
   });
 
   const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
+
+  function localizarLoja() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      return toast("GPS indisponível neste aparelho", "⚠️");
+    }
+    toast("Obtendo localização da loja...", "📍");
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setF((s) => ({ ...s, storeLat: p.coords.latitude, storeLng: p.coords.longitude }));
+        toast("Localização da loja definida 📍");
+      },
+      () => toast("Não foi possível obter o GPS", "⚠️"),
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  }
 
   const [salvando, setSalvando] = useState(false);
 
@@ -47,8 +64,15 @@ function CadastroInner() {
     if (tipo === "lojista" && !f.pixKey) return toast("Informe a chave Pix da loja", "⚠️");
     if (tipo === "entregador" && !f.veiculo) return toast("Informe seu veículo", "⚠️");
 
+    // fallback: se não definiu no mapa, usa o centro de Campo Grande
+    const payload = { tipo, ...f };
+    if (tipo === "lojista" && payload.storeLat == null) {
+      payload.storeLat = -20.4697 + (Math.random() - 0.5) * 0.04;
+      payload.storeLng = -54.6201 + (Math.random() - 0.5) * 0.04;
+    }
+
     setSalvando(true);
-    const res = await register({ tipo, ...f });
+    const res = await register(payload);
     setSalvando(false);
     if (!res.ok) return toast(res.erro, "⚠️");
     if (res.precisaConfirmar) {
@@ -138,6 +162,12 @@ function CadastroInner() {
           </div>
           <p className="helper" style={{ padding: 0 }}>
             🔑 É nessa chave que os clientes vão pagar quando escolherem <strong>Pix online</strong>.
+          </p>
+          <button className="btn btn--outline btn--block" style={{ marginTop: 10 }} onClick={localizarLoja}>
+            {f.storeLat ? "✅ Local da loja definido — tocar para atualizar" : "📍 Definir local da loja no mapa"}
+          </button>
+          <p className="helper" style={{ padding: "6px 0 0" }}>
+            📍 Usado para calcular a rota e a distância até o cliente.
           </p>
         </div>
       )}

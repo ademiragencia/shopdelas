@@ -26,6 +26,22 @@ export default function CheckoutPage() {
   );
   const [modo, setModo] = useState("pix_online"); // 'pix_online' | 'entrega'
   const [metodoEntrega, setMetodoEntrega] = useState("cartao");
+  const [home, setHome] = useState(null);
+
+  function usarLocalizacao() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      return toast("GPS indisponível neste aparelho", "⚠️");
+    }
+    toast("Obtendo sua localização...", "📍");
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setHome({ lat: p.coords.latitude, lng: p.coords.longitude });
+        toast("Localização de entrega definida 📍");
+      },
+      () => toast("Não foi possível obter o GPS", "⚠️"),
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  }
 
   // Lojas presentes na sacola (para o Pix online por loja)
   const lojasNaSacola = useMemo(() => {
@@ -94,8 +110,11 @@ export default function CheckoutPage() {
             pago: false,
           };
 
+    // fallback: centro de Campo Grande com leve deslocamento, para o mapa ter o destino
+    const homeGeo = home || { lat: -20.4697 + (Math.random() - 0.5) * 0.03, lng: -54.6201 + (Math.random() - 0.5) * 0.03 };
+
     setEnviando(true);
-    const res = await placeOrder({ subtotal, frete, total, endereco: form, pagamento });
+    const res = await placeOrder({ subtotal, frete, total, endereco: form, pagamento, home: homeGeo });
     setEnviando(false);
     if (!res.ok) return toast(res.erro || "Não foi possível criar o pedido", "⚠️");
     toast("Pedido confirmado! 🎉");
@@ -112,6 +131,13 @@ export default function CheckoutPage() {
       {/* Endereço */}
       <div className="card-block">
         <h3>📍 Endereço de entrega</h3>
+        <button
+          className="btn btn--outline btn--block"
+          style={{ marginBottom: 12, padding: "10px 12px" }}
+          onClick={usarLocalizacao}
+        >
+          {home ? "✅ Localização definida — toque para atualizar" : "📍 Usar minha localização atual"}
+        </button>
         <div className="field">
           <label>Nome completo</label>
           <input value={form.nome} onChange={(e) => up("nome", e.target.value)} placeholder="Seu nome" />

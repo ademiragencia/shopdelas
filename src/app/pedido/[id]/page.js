@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { useStore, ORDER_STEPS } from "@/lib/store";
 import { formatBRL } from "@/lib/data";
 import MapTrack from "@/components/MapTrack";
+
+const LiveMap = dynamic(() => import("@/components/LiveMap"), { ssr: false });
 
 export default function OrderTrackingPage() {
   const { id } = useParams();
@@ -57,9 +60,18 @@ export default function OrderTrackingPage() {
       </div>
 
       {/* Mapa de rastreamento */}
-      {order.rider && order.storeCoord && (
+      {order.rider && (order.storeCoord || order.geo?.store) && (
         <div style={{ padding: "14px 14px 0" }}>
-          <MapTrack order={order} />
+          {order.geo?.store && order.geo?.home ? (
+            <LiveMap
+              store={order.geo.store}
+              home={order.geo.home}
+              rider={order.geo.rider || order.geo.store}
+              badge={entregue ? "✅ Entregue" : `🛵 ${order.rider.nome?.split(" ")[0]} a caminho`}
+            />
+          ) : (
+            <MapTrack order={order} />
+          )}
           <div className="rider-card">
             <div className="rider-card__ava">{order.rider.emoji || "🛵"}</div>
             <div style={{ flex: 1 }}>

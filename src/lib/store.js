@@ -24,6 +24,8 @@ function normStore(r) {
     pixKey: r.pix_key,
     pixTipo: r.pix_tipo,
     coord: r.coord || { x: 50, y: 40 },
+    lat: r.lat ?? null,
+    lng: r.lng ?? null,
   };
 }
 function normProduct(r) {
@@ -67,6 +69,11 @@ function normOrder(r) {
     pagamento: r.pagamento,
     storeCoord: r.store_coord,
     homeCoord: r.home_coord,
+    geo: {
+      store: r.store_lat != null ? { lat: Number(r.store_lat), lng: Number(r.store_lng) } : null,
+      home: r.home_lat != null ? { lat: Number(r.home_lat), lng: Number(r.home_lng) } : null,
+      rider: r.rider_lat != null ? { lat: Number(r.rider_lat), lng: Number(r.rider_lng) } : null,
+    },
     criadoEm: r.created_at,
     rider: r.rider ? { id: r.rider_id, ...r.rider } : null,
     itens,
@@ -231,6 +238,8 @@ export function StoreProvider({ children }) {
         pix_key: d.pixKey || d.email,
         pix_tipo: d.pixTipo || "E-mail",
         coord: { x: Math.round(20 + Math.random() * 60), y: Math.round(20 + Math.random() * 40) },
+        lat: d.storeLat ?? null,
+        lng: d.storeLng ?? null,
       });
     }
     await Promise.all([loadCatalog(), loadProfile(uid), loadOrders(uid)]);
@@ -304,7 +313,8 @@ export function StoreProvider({ children }) {
 
   // ---- pedido ----
   const placeOrder = async (base) => {
-    const storeCoord = getStore(cart[0]?.storeId)?.coord || { x: 30, y: 30 };
+    const loja = getStore(cart[0]?.storeId);
+    const storeCoord = loja?.coord || { x: 30, y: 30 };
     const { data, error } = await supabase.rpc("place_order", {
       p_items: cart.map((i) => ({
         productId: i.productId, storeId: i.storeId, nome: i.nome, emoji: i.emoji,
@@ -316,11 +326,19 @@ export function StoreProvider({ children }) {
       p_endereco: base.endereco,
       p_pagamento: base.pagamento,
       p_store_coord: storeCoord,
+      p_store_lat: loja?.lat ?? null,
+      p_store_lng: loja?.lng ?? null,
+      p_home_lat: base.home?.lat ?? null,
+      p_home_lng: base.home?.lng ?? null,
     });
     if (error) return { ok: false, erro: traduzErro(error.message) };
     clearCart();
     await loadOrders(profile?.id);
     return { ok: true, codigo: data.codigo, id: data.id };
+  };
+
+  const updateRiderLocation = async (orderId, lat, lng) => {
+    await supabase.rpc("update_rider_location", { p_order_id: orderId, p_lat: lat, p_lng: lng });
   };
   const getOrder = (x) => orders.find((o) => o.id === x || o.codigo === x);
 
@@ -339,7 +357,7 @@ export function StoreProvider({ children }) {
       register, login, logout,
       addProduct, updateProduct, deleteProduct, updateStore,
       setRiderOnline, ordersForRider, advanceOrder, ordersForStore,
-      placeOrder, getOrder,
+      placeOrder, getOrder, updateRiderLocation,
     }),
     [ready, cart, favorites, orders, address, stores, products, profile]
   );
